@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FTD Smart Sourcing - Painel IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen">
+
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <header class="text-center mb-10 border-b border-gray-800 pb-6">
+            <h1 class="text-3xl font-extrabold text-blue-400 tracking-tight">FTD SMART SOURCING</h1>
+            <p class="text-gray-400 mt-2">Busca Automatizada e Ranking de Fornecedores via Machine Learning</p>
+        </header>
+
+        <div class="flex justify-center mb-8">
+            <button id="btn-consultar" onclick="consultarIA()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-200 transform hover:scale-105 flex items-center gap-2">
+                <span>🤖 Consultar Inteligência Artificial</span>
+            </button>
+        </div>
+
+        <div id="loading" class="hidden text-center text-blue-400 font-medium animate-pulse mb-6">
+            Puxando dados do PostgreSQL e treinando o modelo de ML...
+        </div>
+
+        <div class="bg-gray-800 rounded-xl shadow-2xl overflow-hidden border border-gray-700">
+            <div class="p-6 border-b border-gray-700 bg-gray-850">
+                <h2 class="text-xl font-bold text-gray-200 flex items-center gap-2">
+                    📊 Classificação Geral (Top 10 Fornecedores)
+                </h2>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-750 text-gray-400 text-sm uppercase tracking-wider border-b border-gray-700">
+                            <th class="py-4 px-6 font-semibold">Posição</th>
+                            <th class="py-4 px-6 font-semibold">Fornecedor</th>
+                            <th class="py-4 px-6 font-semibold">Preço de Face</th>
+                            <th class="py-4 px-6 font-semibold">Qualidade Técnica</th>
+                            <th class="py-4 px-6 font-semibold">Custo Real Previsto (IA)</th>
+                            <th class="py-4 px-6 font-semibold text-right">Score de Eficiência</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-corpo" class="divide-y divide-y-gray-700 text-gray-300">
+                        <tr>
+                            <td colspan="6" class="py-8 text-center text-gray-500">
+                                Clique no botão acima para carregar o ranking vivo do banco de dados.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function consultarIA() {
+            const btn = document.getElementById('btn-consultar');
+            const loading = document.getElementById('loading');
+            const tabelaCorpo = document.getElementById('tabela-corpo');
+
+            btn.disabled = true;
+            loading.classList.remove('hidden');
+            tabelaCorpo.innerHTML = '';
+
+            try {
+                const response = await fetch('http://127.0.0.1:5000/prever-custo', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ "refacoes": 0, "atrasos": 0 })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Falha ao conectar na API da IA.');
+                }
+
+                const dados = await response.json();
+                const listaFornecedores = dados.fornecedores_top_10;
+
+                tabelaCorpo.innerHTML = '';
+
+                listaFornecedores.forEach((fornecedor, index) => {
+                    let badgeClass = "text-gray-400";
+                    if (index === 0) badgeClass = "text-yellow-400 font-bold text-lg";
+                    if (index === 1) badgeClass = "text-gray-300 font-bold text-lg";
+                    if (index === 2) badgeClass = "text-amber-600 font-bold text-lg";
+
+                    const linha = `
+                        <tr class="hover:bg-gray-750 transition duration-150">
+                            <td class="py-4 px-6 ${badgeClass}">${index + 1}º</td>
+                            <td class="py-4 px-6 font-semibold text-white">${fornecedor.fornecedor}</td>
+                            <td class="py-4 px-6">R$ ${fornecedor.preco_historico.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                            <td class="py-4 px-6">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-blue-400 font-medium">${fornecedor.nota_qualidade.toFixed(1)}</span>
+                                    <span class="text-xs text-gray-500">/10</span>
+                                </div>
+                            </td>
+                            <td class="py-4 px-6 text-red-400 font-medium">R$ ${fornecedor.custo_real.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                            <td class="py-4 px-6 text-right font-bold text-green-400">${fornecedor.score_eficiencia.toFixed(2)}</td>
+                        </tr>
+                    `;
+                    tabelaCorpo.innerHTML += linha;
+                });
+
+            } catch (error) {
+                console.error(error);
+                tabelaCorpo.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="py-8 text-center text-red-400 font-semibold">
+                            ❌ Erro ao buscar dados da IA. Certifique-se de que o container do Flask está rodando na porta 5000!
+                        </td>
+                    </tr>
+                `;
+            } finally {
+                btn.disabled = false;
+                loading.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
