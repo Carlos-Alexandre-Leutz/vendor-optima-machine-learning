@@ -21,6 +21,22 @@ if not DATABASE_URL:
     )
 
 engine = create_engine(DATABASE_URL)
+try:
+    with engine.connect() as conn:
+        tabela_existe = conn.execute(text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'fornecedores');")).scalar()
+
+        if not tabela_existe:
+
+            sql_path = os.path.join(os.path.dirname(__file__), 'init-db', '01-init.sql')
+
+            with open(sql_path, 'r', encoding='utf-8') as f:
+                sql_script = f.read()
+
+            conn.execute(text(sql_script))
+            conn.commit()
+
+except Exception as e:
+    print(f"⚠️ Alerta ao carregar o script de inicialização: {e}")
 
 @app.route('/prever-custo', methods=['POST', 'OPTIONS'])
 @cross_origin()
